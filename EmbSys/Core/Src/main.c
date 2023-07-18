@@ -20,9 +20,12 @@
 #include "main.h"
 #include "string.h"
 #include "cmsis_os.h"
+//#include "cmsis_os2.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdlib.h>
+#include <stdio.h>
 #include "stm32f769i_discovery.h"
 #include "stm32f769i_discovery_lcd.h"
 #include "stm32f769i_discovery_ts.h"
@@ -119,6 +122,43 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 4096 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };   uint8_t cec_receive_buffer[16];
+
+osThreadId_t fibonacci_taskHandle;
+const osThreadAttr_t fibonacci_Task_attributes = {
+		.name = "Fibi",
+		.stack_size = 512 * 4,
+		.priority = (osPriority_t) osPriorityNormal,
+};
+
+osThreadId_t game_of_life_taskHandle;
+const osThreadAttr_t game_of_life_Task_attributes = {
+		.name = "Gol",
+		.stack_size = 512 * 4,
+		.priority = (osPriority_t) osPriorityNormal,
+};
+
+osThreadId_t wirewolrd_taskHandle;
+const osThreadAttr_t wirewolrd_Task_attributes = {
+		.name = "Ww",
+		.stack_size = 512 * 4,
+		.priority = (osPriority_t) osPriorityNormal,
+};
+
+osThreadId_t LCD_manager_taskHandle;
+const osThreadAttr_t LCD_manager_Task_attributes = {
+		.name = "Lcd",
+		.stack_size = 512 * 4,
+		.priority = (osPriority_t) osPriorityNormal,
+};
+
+uint32_t ts_status = TS_OK;
+TS_StateTypeDef  TS_State = {0};
+
+int APP_PAGE;
+int prev_page;
+#define FIB 0
+#define GOL 1
+#define WW 	2
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -160,10 +200,145 @@ void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+int integer_length(int num) {
+	int result = 0;
+	if (num == 0) {
+		return 1;
+	}
+
+	while (num > 0) {
+		num /= 10;
+		result++;
+	}
+	return result;
+}
+
+int fibonnaci_f (int num) {
+
+	int result = 1;
+	if (num <= 0) {
+		result = 0;
+	} else if (num == 1) {
+		result = 1;
+	} else {
+		int prev = 0;
+		int curr = 1;
+		int next;
+		int i;
+
+		for (i = 2; i <= num; i++) {
+			next = prev + curr;
+			prev = curr;
+			curr = next;
+		}
+		result = curr;
+	}
+	return result;
+}
+
+void fibonacci_t (void* args) {
+
+	while (1) {
+		fibonnaci_f(20);
+
+		int stack_space = osThreadGetStackSpace(fibonacci_taskHandle);
+		int stack_space_strlen = integer_length(stack_space);
+		char stack_size_str[stack_space_strlen];
+		sprintf(stack_size_str, "%d", stack_space);
+
+		BSP_LCD_DisplayStringAt(50, 100, (uint8_t*) stack_size_str, CENTER_MODE);
+		osDelay(50);
+	}
+}
+
+void game_of_life_t (void* args) {
+
+	while(1) {
+
+		osDelay(50);
+	}
+}
+
+void wireworld_t (void* args) {
+
+	while(1) {
+
+		osDelay(50);
+	}
+}
+
+void LCD_manager_t (void* args) {
+	char Fibonacci_str[] = "Fibonacci";
+	char Game_of_life_str[] = "Game Of Life";
+	char Worldwire_str[] = "Worldwire";
+
+	BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
+	BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
+	BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
+
+	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+	BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+	if (APP_PAGE == FIB) {
+		BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
+	} else if (APP_PAGE == GOL) {
+		BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
+	} else {
+		BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
+	}
+
+	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+	BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
+
+	while(1) {
+		int number_of_active_threads = osThreadGetCount() - 2;
+		int number_of_active_threads_strlen = integer_length(number_of_active_threads);
+		char number_of_active_threads_str[number_of_active_threads_strlen];
+		sprintf(number_of_active_threads_str, "%d", number_of_active_threads);
+		BSP_LCD_DisplayStringAt(10, 100, (uint8_t*) number_of_active_threads_str, LEFT_MODE);
+
+		BSP_TS_GetState(&TS_State);
+		if (TS_State.touchDetected > 0) {
+			if (TS_State.touchY[0] < 75) {
+				if (TS_State.touchX[0] < 267) {
+					APP_PAGE = FIB;
+				} else if (TS_State.touchX[0] > 267 && TS_State.touchX[0] < 533) {
+					APP_PAGE = GOL;
+				} else {
+					APP_PAGE = WW;
+				}
+			}
+		}
+
+		if (prev_page != APP_PAGE) {
+			BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
+			BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
+			BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
+
+			BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+			BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+			if (APP_PAGE == FIB) {
+				BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
+			} else if (APP_PAGE == GOL) {
+				BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
+			} else {
+				BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
+			}
+			prev_page = APP_PAGE;
+
+			BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+			BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
+		}
+
+		osDelay(50);
+	}
+}
+
 
 /* USER CODE END 0 */
 
@@ -174,7 +349,9 @@ void StartDefaultTask(void *argument);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	extern int APP_PAGE;
+	APP_PAGE = FIB;
+	prev_page = APP_PAGE;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -190,7 +367,7 @@ int main(void)
   SystemClock_Config();
 
 /* Configure the peripherals common clocks */
-  PeriphCommonClock_Config();
+//  PeriphCommonClock_Config();
 
   /* USER CODE BEGIN SysInit */
 
@@ -198,10 +375,35 @@ int main(void)
 
   /* Initialize all configured peripherals */
   /* USER CODE BEGIN 2 */
-	BSP_LCD_Init();
 
-	BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
-	BSP_LCD_Clear(LCD_COLOR_DARKCYAN);
+	GPIO_InitTypeDef gumb_a;
+	gumb_a.Pin = GPIO_PIN_0;
+	gumb_a.Mode = GPIO_MODE_IT_RISING_FALLING;
+	gumb_a.Pull = GPIO_NOPULL;
+	gumb_a.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOA, &gumb_a);
+
+	HAL_NVIC_SetPriority(EXTI0_IRQn, 1, 2);
+	HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  BSP_LCD_Init();
+  BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
+
+  ts_status = BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
+  while(ts_status != TS_OK);
+
+  ts_status = BSP_TS_ITConfig();
+  while(ts_status != TS_OK);
+
+  BSP_TS_INT_MspInit();
+
+	BSP_LCD_Clear(LCD_COLOR_DARKMAGENTA);
+	BSP_LCD_DrawVLine(267, 0, 75);
+	BSP_LCD_DrawVLine(534, 0, 75);
+
+	BSP_LCD_DrawHLine(0, 75, BSP_LCD_GetXSize());
+	BSP_LCD_DrawVLine(100, 75, BSP_LCD_GetYSize() - 75);
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -225,10 +427,14 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+//  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+	fibonacci_taskHandle = osThreadNew(fibonacci_t, NULL, &fibonacci_Task_attributes);
+	game_of_life_taskHandle = osThreadNew(game_of_life_t, NULL, &game_of_life_Task_attributes);
+	wirewolrd_taskHandle = osThreadNew(wireworld_t, NULL, &wirewolrd_Task_attributes);
+	LCD_manager_taskHandle = osThreadNew(LCD_manager_t, NULL, &LCD_manager_Task_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -237,6 +443,7 @@ int main(void)
 
   /* Start scheduler */
   osKernelStart();
+
 
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
@@ -1816,7 +2023,13 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+//    BSP_TS_GetState(&TS_State);
+//	if(TS_State.touchDetected > 0) {
+//		if (TS_State.touchY[0] > 30) {
+//			BSP_LCD_DrawCircle(TS_State.touchX[0], TS_State.touchY[0], 30);
+//		}
+//	}
+    osDelay(20);
   }
   /* USER CODE END 5 */
 }

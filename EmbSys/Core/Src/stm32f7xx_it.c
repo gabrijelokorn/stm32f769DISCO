@@ -20,6 +20,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f7xx_it.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "stm32f769i_discovery_ts.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
@@ -250,4 +254,28 @@ void DSI_IRQHandler(void)
 
 /* USER CODE BEGIN 1 */
 
+/**
+  * @brief This function handles System tick timer.
+  */
+
+extern int APP_PAGE;
+uint32_t lastClick = 0;
+
+void EXTI0_IRQHandler() {
+	if (__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_0)) {
+		if (HAL_GetTick() - lastClick > 500) {
+			APP_PAGE++;
+			if (APP_PAGE > 2) APP_PAGE = APP_PAGE % 3;
+			lastClick = HAL_GetTick();
+		}
+	}
+	__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
+}
+
+void EXTI15_10_IRQHandler(void)
+{
+
+  HAL_GPIO_EXTI_IRQHandler(TS_INT_PIN); // Reset the GPIO_PIN_13 Interrupt - Touch Screen
+
+}
 /* USER CODE END 1 */
