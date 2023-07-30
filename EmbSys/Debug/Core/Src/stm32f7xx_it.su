@@ -10,5 +10,5 @@
 ../Core/Src/stm32f7xx_it.c:216:6:DMA2D_IRQHandler	8	static
 ../Core/Src/stm32f7xx_it.c:230:6:CEC_IRQHandler	8	static
 ../Core/Src/stm32f7xx_it.c:244:6:DSI_IRQHandler	8	static
-../Core/Src/stm32f7xx_it.c:264:6:EXTI0_IRQHandler	8	static
-../Core/Src/stm32f7xx_it.c:275:6:EXTI15_10_IRQHandler	8	static
+../Core/Src/stm32f7xx_it.c:265:6:EXTI0_IRQHandler	8	static
+../Core/Src/stm32f7xx_it.c:276:6:EXTI15_10_IRQHandler	8	static

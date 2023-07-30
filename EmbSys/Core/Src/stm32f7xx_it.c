@@ -259,11 +259,12 @@ void DSI_IRQHandler(void)
   */
 
 extern int APP_PAGE;
+#define REFRESH_RATE 300
 uint32_t lastClick = 0;
 
 void EXTI0_IRQHandler() {
 	if (__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_0)) {
-		if (HAL_GetTick() - lastClick > 500) {
+		if (HAL_GetTick() - lastClick > REFRESH_RATE) {
 			APP_PAGE++;
 			if (APP_PAGE > 2) APP_PAGE = APP_PAGE % 3;
 			lastClick = HAL_GetTick();

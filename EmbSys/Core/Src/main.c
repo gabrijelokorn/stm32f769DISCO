@@ -26,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "stm32f769i_discovery.h"
 #include "stm32f769i_discovery_lcd.h"
 #include "stm32f769i_discovery_ts.h"
@@ -129,6 +130,7 @@ const osThreadAttr_t fibonacci_Task_attributes = {
 		.stack_size = 512 * 4,
 		.priority = (osPriority_t) osPriorityNormal,
 };
+int calculating = 1;
 
 osThreadId_t game_of_life_taskHandle;
 const osThreadAttr_t game_of_life_Task_attributes = {
@@ -152,13 +154,27 @@ const osThreadAttr_t LCD_manager_Task_attributes = {
 };
 
 uint32_t ts_status = TS_OK;
+osStatus_t message_status = osError;
 TS_StateTypeDef  TS_State = {0};
+
+osMessageQueueId_t thread_manager_message;
 
 int APP_PAGE;
 int prev_page;
 #define FIB 0
 #define GOL 1
 #define WW 	2
+#define STACK_CAPACITY 512 * 4
+
+#define GOL_STARTPOINT_X 250
+#define GOL_STARTPOINT_Y 100
+#define GOL_BOX_SIZE 350
+#define GOL_CELL_SIZE 70
+#define GOL_CELLS 5
+
+#define MENU_HEIGHT 75
+#define MENU_PANEL_WIDTH 267
+#define STACK_VIEW_WIDTH 200
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -200,11 +216,18 @@ void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+typedef struct _thread_info {
+	uint8_t pid;
+	int stack_space;
+	int stack_size;
+	uint32_t sent_messages;
+	int time_running;
+} thread_info;
 
 int integer_length(int num) {
 	int result = 0;
@@ -219,88 +242,337 @@ int integer_length(int num) {
 	return result;
 }
 
+
+void fibonacci_display_num() {
+	int number_strlen = integer_length(calculating);
+	char number[number_strlen];
+	sprintf(number, "%d", calculating);
+	BSP_LCD_DisplayStringAt(460, 230, (uint8_t*) number, LEFT_MODE);
+}
+
+void fibonacci_prepare() {
+	BSP_LCD_FillRect(300, 150, 150, 200);
+	BSP_LCD_DisplayStringAt(370, 230, (uint8_t*) "-", LEFT_MODE);
+	BSP_LCD_FillRect(500, 150, 150, 200);
+	BSP_LCD_DisplayStringAt(570, 230, (uint8_t*) "+", LEFT_MODE);
+	fibonacci_display_num();
+}
+
+int fibonacci_inc (int num) {
+	return ++num;
+}
+
+int fibonacci_dec (int num) {
+	if (num <= 1) return 1;
+	else return --num;
+}
+
 int fibonnaci_f (int num) {
 
-	int result = 1;
-	if (num <= 0) {
-		result = 0;
+	if (num == 0) {
+		return 0;
 	} else if (num == 1) {
-		result = 1;
+		return 1;
 	} else {
-		int prev = 0;
-		int curr = 1;
-		int next;
-		int i;
-
-		for (i = 2; i <= num; i++) {
-			next = prev + curr;
-			prev = curr;
-			curr = next;
-		}
-		result = curr;
+		return (fibonnaci_f(num - 1) + fibonnaci_f(num - 2));
 	}
-	return result;
 }
 
 void fibonacci_t (void* args) {
 
+	thread_info *fibonacci_info = malloc(sizeof(thread_info));
+	fibonacci_info->pid = FIB;
+	fibonacci_info->sent_messages = 0;
+	fibonacci_info->stack_size = STACK_CAPACITY;
+	fibonacci_info->time_running = 0;
+
 	while (1) {
-		fibonnaci_f(20);
+		fibonnaci_f(calculating);
 
-		int stack_space = osThreadGetStackSpace(fibonacci_taskHandle);
-		int stack_space_strlen = integer_length(stack_space);
-		char stack_size_str[stack_space_strlen];
-		sprintf(stack_size_str, "%d", stack_space);
+		if (APP_PAGE == FIB) {
+			int stack_space = osThreadGetStackSpace(fibonacci_taskHandle);
+			fibonacci_info->stack_space = stack_space;
 
-		BSP_LCD_DisplayStringAt(50, 100, (uint8_t*) stack_size_str, CENTER_MODE);
-		osDelay(50);
+			if (osMessageQueuePut(thread_manager_message, &fibonacci_info, 0, osWaitForever) == osOK) {
+				fibonacci_info->sent_messages += 1;
+			}
+			BSP_TS_GetState(&TS_State);
+			if (TS_State.touchDetected > 0) {
+				if (TS_State.touchY[0] > 300 && TS_State.touchX[0] < STACK_VIEW_WIDTH) {
+					osThreadTerminate(fibonacci_taskHandle);
+				} else if (TS_State.touchX[0] > 300 && TS_State.touchX[0] < 450 && TS_State.touchY[0] > 150 && TS_State.touchY[0] < 350) {
+					calculating = fibonacci_dec(calculating);
+				} else if (TS_State.touchX[0] > 500 && TS_State.touchX[0] < 650 && TS_State.touchY[0] > 150 && TS_State.touchY[0] < 350) {
+					calculating = fibonacci_inc(calculating);
+				}
+				fibonacci_display_num(calculating);
+			}
+		}
+
+		osDelay(20);
 	}
 }
 
+bool grid[GOL_CELLS][GOL_CELLS];
+osTimerId_t timer_gol;
+
+void prepare_gol() {
+	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+	BSP_LCD_FillRect(GOL_STARTPOINT_X, GOL_STARTPOINT_Y, GOL_BOX_SIZE, GOL_BOX_SIZE);
+	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+
+	// draw horizontal lines
+	for (int i = 0; i < GOL_CELLS; i++) {
+		BSP_LCD_DrawHLine(GOL_STARTPOINT_X, GOL_STARTPOINT_Y + i * GOL_CELL_SIZE, GOL_BOX_SIZE);
+	}
+
+	// draw vertical lines
+	for (int i = 0; i < GOL_CELLS; i++) {
+		BSP_LCD_DrawVLine(GOL_STARTPOINT_X + i * GOL_CELL_SIZE, GOL_STARTPOINT_Y, GOL_BOX_SIZE);
+	}
+}
+
+void gol_display_grid(bool grid[][5]) {
+	// draw horizontal lines
+	for (int i = 0; i < GOL_CELLS; i++) {
+		BSP_LCD_DrawHLine(GOL_STARTPOINT_X, GOL_STARTPOINT_Y + i * GOL_CELL_SIZE, GOL_BOX_SIZE);
+	}
+
+	// draw vertical lines
+	for (int i = 0; i < GOL_CELLS; i++) {
+		BSP_LCD_DrawVLine(GOL_STARTPOINT_X + i * GOL_CELL_SIZE, GOL_STARTPOINT_Y, GOL_BOX_SIZE);
+	}
+
+	for (int i = 0; i < GOL_CELLS; i++) {
+		for (int j = 0; j < GOL_CELLS; j++) {
+			if (grid[i][j] == true) {
+				BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+			} else {
+				BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+			}
+			BSP_LCD_FillRect(GOL_STARTPOINT_X + j * GOL_CELL_SIZE + 1, GOL_STARTPOINT_Y + i * GOL_CELL_SIZE + 1, GOL_CELL_SIZE - 1, GOL_CELL_SIZE - 1);
+		}
+	}
+	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+}
+
+void gol_next_gen(bool grid[][GOL_CELLS]) {
+
+	bool next_gen[GOL_CELLS][GOL_CELLS];
+
+	for (int i = 0; i < GOL_CELLS; i++) {
+		for (int j = 0; j < GOL_CELLS; j++) {
+			next_gen[i][j] = grid[i][j];
+		}
+	}
+
+	for (int i = 0; i < GOL_CELLS; i++) {
+		for (int j = 0; j < GOL_CELLS; j++) {
+
+			uint8_t neigh = 0;
+			// count neigbours
+			if (i > 0) {
+				if (j > 0) {
+					if (grid[i - 1][j - 1]) neigh++; // 1 - levo gor
+				}
+				if (grid[i - 1][j]) neigh++; // 2 - gor
+				if (j < GOL_CELLS - 1) {
+					if (grid[i - 1][j + 1]) neigh++; // 3 - desno gor
+				}
+			}
+			if (i < GOL_CELLS - 1) {
+				if (j > 0) {
+					if (grid[i + 1][j - 1]) neigh++; // 4 - levo dol
+				}
+				if (grid[i + 1][j]) neigh++; // 5 - dol
+				if (j < GOL_CELLS - 1) {
+					if (grid[i + 1][j + 1]) neigh++; // 6 - desno dol
+				}
+			}
+			if (j > 0) {
+					if (grid[i][j - 1]) neigh++; // 7 - levo
+			}
+			if (j < GOL_CELLS - 1) {
+					if (grid[i][j + 1]) neigh++; // 8 - desno
+			}
+
+			if (grid[i][j]) {
+				if (!(neigh == 2 || neigh == 3)) {
+					next_gen[i][j] = false;
+				}
+			} else {
+				if (neigh == 3) {
+					next_gen[i][j] = true;
+				}
+			}
+
+		}
+	}
+	for (int i = 0; i < GOL_CELLS; i++) {
+		for (int j = 0; j < GOL_CELLS; j++) {
+			grid[i][j] = next_gen[i][j];
+		}
+	}
+}
+
+// && (osThreadGetState(game_of_life_taskHandle) == osThreadRunning || osThreadGetState(game_of_life_taskHandle) == osThreadReady)
+void gol_timer_func(){
+	if (APP_PAGE == GOL) {
+		gol_display_grid(grid);
+		gol_next_gen(grid);
+	}
+}
+
+
+
 void game_of_life_t (void* args) {
+
+	thread_info *gol_info = malloc(sizeof(thread_info));
+	gol_info->pid = GOL;
+	gol_info->sent_messages = 0;
+	gol_info->stack_size = STACK_CAPACITY;
+	gol_info->time_running = 4;
+
+
+	// initiate grid
+
+	for (int i = 0; i < GOL_CELLS; i++) {
+		for (int j = 0; j < GOL_CELLS; j++) {
+			grid[i][j] = false;
+		}
+	}
+
+	grid[1][2] = true;
+	grid[2][2] = true;
+	grid[3][2] = true;
 
 	while(1) {
 
-		osDelay(50);
+		if (APP_PAGE == GOL) {
+			int stack_space = osThreadGetStackSpace(game_of_life_taskHandle);
+			gol_info->stack_space = stack_space;
+
+			if(osMessageQueuePut(thread_manager_message, &gol_info, 0, osWaitForever) == osOK) {
+				gol_info->sent_messages += 1;
+			}
+
+			BSP_TS_GetState(&TS_State);
+			if (TS_State.touchDetected > 0) {
+				if (TS_State.touchY[0] > 300 && TS_State.touchX[0] < STACK_VIEW_WIDTH) {
+					osThreadTerminate(fibonacci_taskHandle);
+				}
+			}
+
+		}
+
+
+		osDelay(20);
 	}
 }
 
 void wireworld_t (void* args) {
 
+	thread_info *ww_info = malloc(sizeof(thread_info));
+	ww_info->pid = WW;
+	ww_info->sent_messages = 0;
+	ww_info->stack_size = STACK_CAPACITY;
+	ww_info->time_running = 0;
+
 	while(1) {
 
-		osDelay(50);
+		if (APP_PAGE == WW) {
+			int stack_space = osThreadGetStackSpace(wirewolrd_taskHandle);
+
+			ww_info->stack_space = stack_space;
+			if(osMessageQueuePut(thread_manager_message, &ww_info, 0, osWaitForever) == osOK) {
+				ww_info->sent_messages += 1;
+			}
+		}
+
+		osDelay(20);
 	}
 }
 
-void LCD_manager_t (void* args) {
-	char Fibonacci_str[] = "Fibonacci";
-	char Game_of_life_str[] = "Game Of Life";
-	char Worldwire_str[] = "Worldwire";
+void prepare_pages() {
+		BSP_LCD_SetTextColor(LCD_COLOR_LIGHTMAGENTA);
+		BSP_LCD_FillRect(STACK_VIEW_WIDTH, MENU_HEIGHT, BSP_LCD_GetXSize() - STACK_VIEW_WIDTH, BSP_LCD_GetYSize() - MENU_HEIGHT);
+		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+		if (APP_PAGE == FIB) {
+			fibonacci_prepare();
+		} else if (APP_PAGE == GOL) {
+			prepare_gol();
+		} else {
 
-	BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
-	BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
-	BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
+		}
+}
+
+void refresh_navigation() {
+	if (prev_page != APP_PAGE) {
+		BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) "Fibonacci", LEFT_MODE);
+		BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) "Game of Life", LEFT_MODE);
+		BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) "Worldwire", LEFT_MODE);
+
+		BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+		BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+		if (APP_PAGE == FIB) {
+			BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) "Fibonacci", LEFT_MODE);
+		} else if (APP_PAGE == GOL) {
+			BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) "Game of Life", LEFT_MODE);
+		} else {
+			BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) "Wireworld", LEFT_MODE);
+		}
+		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+		BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
+
+		BSP_LCD_DisplayStringAt(10, 100, (uint8_t*) "           ", LEFT_MODE);
+		BSP_LCD_DisplayStringAt(10, 130, (uint8_t*) "           ", LEFT_MODE);
+		BSP_LCD_DisplayStringAt(10, 160, (uint8_t*) "           ", LEFT_MODE);
+		BSP_LCD_DisplayStringAt(10, 190, (uint8_t*) "           ", LEFT_MODE);
+
+		prepare_pages();
+		prev_page = APP_PAGE;
+	}
+
+}
+
+void prepare_navigation() {
+	BSP_LCD_DisplayStringAt(10, 100, (uint8_t*) "           ", LEFT_MODE);
+	BSP_LCD_DisplayStringAt(10, 130, (uint8_t*) "           ", LEFT_MODE);
+	BSP_LCD_DisplayStringAt(10, 160, (uint8_t*) "           ", LEFT_MODE);
+	BSP_LCD_DisplayStringAt(10, 190, (uint8_t*) "           ", LEFT_MODE);
+	BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) "Fibonacci", LEFT_MODE);
+	BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) "Game of Life", LEFT_MODE);
+	BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) "Worldwire", LEFT_MODE);
 
 	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
 	BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
 	if (APP_PAGE == FIB) {
-		BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
+	BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) "Fibonacci", LEFT_MODE);
 	} else if (APP_PAGE == GOL) {
-		BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
+	BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) "Game of Life", LEFT_MODE);
 	} else {
-		BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
+	BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) "Worldwire", LEFT_MODE);
 	}
 
 	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
 	BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
 
+	prepare_pages();
+}
+
+void LCD_manager_t (void* args) {
+
+	prepare_navigation();
+
+	thread_info *received_message = malloc(sizeof(thread_info));
+
 	while(1) {
-		int number_of_active_threads = osThreadGetCount() - 2;
+		int number_of_active_threads = osThreadGetCount();
 		int number_of_active_threads_strlen = integer_length(number_of_active_threads);
 		char number_of_active_threads_str[number_of_active_threads_strlen];
-		sprintf(number_of_active_threads_str, "%d", number_of_active_threads);
-		BSP_LCD_DisplayStringAt(10, 100, (uint8_t*) number_of_active_threads_str, LEFT_MODE);
+		sprintf(number_of_active_threads_str, "Threads: %d", number_of_active_threads);
+ 		BSP_LCD_DisplayStringAt(10, 380, (uint8_t*) number_of_active_threads_str, LEFT_MODE);
+
 
 		BSP_TS_GetState(&TS_State);
 		if (TS_State.touchDetected > 0) {
@@ -314,26 +586,43 @@ void LCD_manager_t (void* args) {
 				}
 			}
 		}
+		refresh_navigation();
 
-		if (prev_page != APP_PAGE) {
-			BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
-			BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
-			BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
+		// stack view
+		osMessageQueueGet(thread_manager_message, &received_message, NULL, osWaitForever);
 
-			BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
-			BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
-			if (APP_PAGE == FIB) {
-				BSP_LCD_DisplayStringAt(50, 20, (uint8_t*) Fibonacci_str, LEFT_MODE);
-			} else if (APP_PAGE == GOL) {
-				BSP_LCD_DisplayStringAt(300, 20, (uint8_t*) Game_of_life_str, LEFT_MODE);
-			} else {
-				BSP_LCD_DisplayStringAt(580, 20, (uint8_t*) Worldwire_str, LEFT_MODE);
-			}
-			prev_page = APP_PAGE;
+		int pid = received_message->pid;
+		int pid_strlen = integer_length(pid);
+		char PID[] = "PID";
+		char pid_str[strlen(PID) + pid_strlen];
+		sprintf(pid_str, "%s:%d", PID, pid);
+		BSP_LCD_DisplayStringAt(10, 100, (uint8_t*) pid_str, LEFT_MODE);
 
-			BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
-			BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
-		}
+		int stack_space = received_message->stack_space;
+		int stack_space_strlen = integer_length(stack_space);
+		char stack_sp[] = "Unused";
+		char stack_space_str[strlen(stack_sp) + stack_space_strlen];
+		sprintf(stack_space_str, "%s:%3d", stack_sp, stack_space);
+		BSP_LCD_DisplayStringAt(10, 130, (uint8_t*) stack_space_str, LEFT_MODE);
+
+		int stack_size = received_message->stack_size;
+		int stack_size_strlen = integer_length(stack_size);
+		char stack_si[] = "Size";
+		char stack_size_str[strlen(stack_si) + stack_size_strlen];
+		sprintf(stack_size_str, "%s:%d", stack_si, stack_size);
+		BSP_LCD_DisplayStringAt(10, 160, (uint8_t*) stack_size_str, LEFT_MODE);
+
+		int sent_messages = received_message->sent_messages;
+		int sent_messages_strlen = integer_length(sent_messages);
+		char MSG[] = "MSG";
+		char sent_messages_str[strlen(MSG) + sent_messages_strlen];
+		sprintf(sent_messages_str, "%s:%d", MSG, sent_messages);
+		BSP_LCD_DisplayStringAt(10, 190, (uint8_t*) sent_messages_str, LEFT_MODE);
+
+
+
+//		uint8_t* mask = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+
 
 		osDelay(50);
 	}
@@ -352,6 +641,8 @@ int main(void)
 	extern int APP_PAGE;
 	APP_PAGE = FIB;
 	prev_page = APP_PAGE;
+
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -378,7 +669,7 @@ int main(void)
 
 	GPIO_InitTypeDef gumb_a;
 	gumb_a.Pin = GPIO_PIN_0;
-	gumb_a.Mode = GPIO_MODE_IT_RISING_FALLING;
+	gumb_a.Mode = GPIO_MODE_IT_RISING;
 	gumb_a.Pull = GPIO_NOPULL;
 	gumb_a.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOA, &gumb_a);
@@ -397,12 +688,14 @@ int main(void)
 
   BSP_TS_INT_MspInit();
 
-	BSP_LCD_Clear(LCD_COLOR_DARKMAGENTA);
-	BSP_LCD_DrawVLine(267, 0, 75);
-	BSP_LCD_DrawVLine(534, 0, 75);
+	BSP_LCD_Clear(LCD_COLOR_CYAN);
+	BSP_LCD_DrawVLine(MENU_PANEL_WIDTH, 0, MENU_HEIGHT);
+	BSP_LCD_DrawVLine(2 * MENU_PANEL_WIDTH, 0, MENU_HEIGHT);
 
-	BSP_LCD_DrawHLine(0, 75, BSP_LCD_GetXSize());
-	BSP_LCD_DrawVLine(100, 75, BSP_LCD_GetYSize() - 75);
+	BSP_LCD_DrawHLine(0, MENU_HEIGHT, BSP_LCD_GetXSize());
+	BSP_LCD_DrawVLine(STACK_VIEW_WIDTH, MENU_HEIGHT, BSP_LCD_GetYSize() - MENU_HEIGHT);
+
+	BSP_LCD_FillRect(0, 300, STACK_VIEW_WIDTH, BSP_LCD_GetYSize());
 
   /* USER CODE END 2 */
 
@@ -419,10 +712,15 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
+  timer_gol = osTimerNew(gol_timer_func, osTimerPeriodic, NULL, NULL);
+  if (timer_gol != NULL) {
+	  osTimerStart(timer_gol, 1000);
+  }
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+  thread_manager_message = osMessageQueueNew(5, sizeof(thread_info), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
