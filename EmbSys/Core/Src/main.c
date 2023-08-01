@@ -116,6 +116,10 @@ WWDG_HandleTypeDef hwwdg;
 
 SDRAM_HandleTypeDef hsdram1;
 
+#define FIBBIONACI_STACK_CAPACITY 128 * 4
+#define WW_STACK_CAPACITY 512 * 4
+#define GOL_STACK_CAPACITY 512 * 4
+
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
@@ -127,7 +131,7 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t fibonacci_taskHandle;
 const osThreadAttr_t fibonacci_Task_attributes = {
 		.name = "Fibi",
-		.stack_size = 512 * 4,
+		.stack_size = FIBBIONACI_STACK_CAPACITY,
 		.priority = (osPriority_t) osPriorityNormal,
 };
 int calculating = 1;
@@ -135,14 +139,14 @@ int calculating = 1;
 osThreadId_t game_of_life_taskHandle;
 const osThreadAttr_t game_of_life_Task_attributes = {
 		.name = "Gol",
-		.stack_size = 512 * 4,
+		.stack_size = GOL_STACK_CAPACITY,
 		.priority = (osPriority_t) osPriorityNormal,
 };
 
 osThreadId_t wirewolrd_taskHandle;
 const osThreadAttr_t wirewolrd_Task_attributes = {
 		.name = "Ww",
-		.stack_size = 512 * 4,
+		.stack_size = FIBBIONACI_STACK_CAPACITY,
 		.priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -164,13 +168,12 @@ int prev_page;
 #define FIB 0
 #define GOL 1
 #define WW 	2
-#define STACK_CAPACITY 512 * 4
 
 #define GOL_STARTPOINT_X 250
 #define GOL_STARTPOINT_Y 100
-#define GOL_BOX_SIZE 350
-#define GOL_CELL_SIZE 70
-#define GOL_CELLS 5
+#define GOL_BOX_SIZE 360
+#define GOL_CELL_SIZE 40
+#define GOL_CELLS 9
 
 #define MENU_HEIGHT 75
 #define MENU_PANEL_WIDTH 267
@@ -246,7 +249,7 @@ int integer_length(int num) {
 void fibonacci_display_num() {
 	int number_strlen = integer_length(calculating);
 	char number[number_strlen];
-	sprintf(number, "%d", calculating);
+	sprintf(number, "%02d", calculating);
 	BSP_LCD_DisplayStringAt(460, 230, (uint8_t*) number, LEFT_MODE);
 }
 
@@ -281,9 +284,9 @@ int fibonnaci_f (int num) {
 void fibonacci_t (void* args) {
 
 	thread_info *fibonacci_info = malloc(sizeof(thread_info));
-	fibonacci_info->pid = FIB;
+	fibonacci_info->pid = FIB + 1;
 	fibonacci_info->sent_messages = 0;
-	fibonacci_info->stack_size = STACK_CAPACITY;
+	fibonacci_info->stack_size = FIBBIONACI_STACK_CAPACITY;
 	fibonacci_info->time_running = 0;
 
 	while (1) {
@@ -315,6 +318,7 @@ void fibonacci_t (void* args) {
 
 bool grid[GOL_CELLS][GOL_CELLS];
 osTimerId_t timer_gol;
+bool GOL_running = true;
 
 void prepare_gol() {
 	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
@@ -332,7 +336,7 @@ void prepare_gol() {
 	}
 }
 
-void gol_display_grid(bool grid[][5]) {
+void gol_display_grid(bool grid[][GOL_CELLS]) {
 	// draw horizontal lines
 	for (int i = 0; i < GOL_CELLS; i++) {
 		BSP_LCD_DrawHLine(GOL_STARTPOINT_X, GOL_STARTPOINT_Y + i * GOL_CELL_SIZE, GOL_BOX_SIZE);
@@ -355,6 +359,7 @@ void gol_display_grid(bool grid[][5]) {
 	}
 	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
 }
+
 
 void gol_next_gen(bool grid[][GOL_CELLS]) {
 
@@ -417,7 +422,7 @@ void gol_next_gen(bool grid[][GOL_CELLS]) {
 
 // && (osThreadGetState(game_of_life_taskHandle) == osThreadRunning || osThreadGetState(game_of_life_taskHandle) == osThreadReady)
 void gol_timer_func(){
-	if (APP_PAGE == GOL) {
+	if (APP_PAGE == GOL && GOL_running) {
 		gol_display_grid(grid);
 		gol_next_gen(grid);
 	}
@@ -428,9 +433,9 @@ void gol_timer_func(){
 void game_of_life_t (void* args) {
 
 	thread_info *gol_info = malloc(sizeof(thread_info));
-	gol_info->pid = GOL;
+	gol_info->pid = GOL + 1;
 	gol_info->sent_messages = 0;
-	gol_info->stack_size = STACK_CAPACITY;
+	gol_info->stack_size = GOL_STACK_CAPACITY;
 	gol_info->time_running = 4;
 
 
@@ -442,12 +447,12 @@ void game_of_life_t (void* args) {
 		}
 	}
 
-	grid[1][2] = true;
-	grid[2][2] = true;
-	grid[3][2] = true;
+	grid[3][4] = true;
+	grid[4][3] = true;
+	grid[4][4] = true;
+	grid[4][5] = true;
 
 	while(1) {
-
 		if (APP_PAGE == GOL) {
 			int stack_space = osThreadGetStackSpace(game_of_life_taskHandle);
 			gol_info->stack_space = stack_space;
@@ -458,11 +463,17 @@ void game_of_life_t (void* args) {
 
 			BSP_TS_GetState(&TS_State);
 			if (TS_State.touchDetected > 0) {
+
+				uint16_t x = (TS_State.touchX[0] - GOL_STARTPOINT_X) / GOL_CELL_SIZE;
+				uint16_t y = (TS_State.touchY[0] - GOL_STARTPOINT_Y) / GOL_CELL_SIZE;
+
+				grid[y][x] = true;
+
 				if (TS_State.touchY[0] > 300 && TS_State.touchX[0] < STACK_VIEW_WIDTH) {
-					osThreadTerminate(fibonacci_taskHandle);
+					GOL_running = false;
+					osThreadTerminate(game_of_life_taskHandle);
 				}
 			}
-
 		}
 
 
@@ -473,9 +484,9 @@ void game_of_life_t (void* args) {
 void wireworld_t (void* args) {
 
 	thread_info *ww_info = malloc(sizeof(thread_info));
-	ww_info->pid = WW;
+	ww_info->pid = WW + 1;
 	ww_info->sent_messages = 0;
-	ww_info->stack_size = STACK_CAPACITY;
+	ww_info->stack_size = WW_STACK_CAPACITY;
 	ww_info->time_running = 0;
 
 	while(1) {
@@ -494,7 +505,7 @@ void wireworld_t (void* args) {
 }
 
 void prepare_pages() {
-		BSP_LCD_SetTextColor(LCD_COLOR_LIGHTMAGENTA);
+		BSP_LCD_SetTextColor(LCD_COLOR_DARKGRAY);
 		BSP_LCD_FillRect(STACK_VIEW_WIDTH, MENU_HEIGHT, BSP_LCD_GetXSize() - STACK_VIEW_WIDTH, BSP_LCD_GetYSize() - MENU_HEIGHT);
 		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
 		if (APP_PAGE == FIB) {
@@ -602,21 +613,21 @@ void LCD_manager_t (void* args) {
 		int stack_space_strlen = integer_length(stack_space);
 		char stack_sp[] = "Unused";
 		char stack_space_str[strlen(stack_sp) + stack_space_strlen];
-		sprintf(stack_space_str, "%s:%3d", stack_sp, stack_space);
+		sprintf(stack_space_str, "%s:%04d", stack_sp, stack_space);
 		BSP_LCD_DisplayStringAt(10, 130, (uint8_t*) stack_space_str, LEFT_MODE);
 
 		int stack_size = received_message->stack_size;
 		int stack_size_strlen = integer_length(stack_size);
 		char stack_si[] = "Size";
 		char stack_size_str[strlen(stack_si) + stack_size_strlen];
-		sprintf(stack_size_str, "%s:%d", stack_si, stack_size);
+		sprintf(stack_size_str, "%s:%04d", stack_si, stack_size);
 		BSP_LCD_DisplayStringAt(10, 160, (uint8_t*) stack_size_str, LEFT_MODE);
 
 		int sent_messages = received_message->sent_messages;
 		int sent_messages_strlen = integer_length(sent_messages);
 		char MSG[] = "MSG";
 		char sent_messages_str[strlen(MSG) + sent_messages_strlen];
-		sprintf(sent_messages_str, "%s:%d", MSG, sent_messages);
+		sprintf(sent_messages_str, "%s:%04d", MSG, sent_messages);
 		BSP_LCD_DisplayStringAt(10, 190, (uint8_t*) sent_messages_str, LEFT_MODE);
 
 
@@ -688,7 +699,7 @@ int main(void)
 
   BSP_TS_INT_MspInit();
 
-	BSP_LCD_Clear(LCD_COLOR_CYAN);
+	BSP_LCD_Clear(LCD_COLOR_DARKCYAN);
 	BSP_LCD_DrawVLine(MENU_PANEL_WIDTH, 0, MENU_HEIGHT);
 	BSP_LCD_DrawVLine(2 * MENU_PANEL_WIDTH, 0, MENU_HEIGHT);
 
@@ -714,7 +725,7 @@ int main(void)
   /* start timers, add new ones, ... */
   timer_gol = osTimerNew(gol_timer_func, osTimerPeriodic, NULL, NULL);
   if (timer_gol != NULL) {
-	  osTimerStart(timer_gol, 1000);
+	  osTimerStart(timer_gol, 500);
   }
   /* USER CODE END RTOS_TIMERS */
 
