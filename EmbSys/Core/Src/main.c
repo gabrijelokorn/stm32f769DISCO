@@ -606,17 +606,13 @@ void wireworld_t (void* args) {
 				ww_step = false;
 			}
 
-			mutex_status = osMutexAcquire(ww_mutex_id, osWaitForever);
-			if (mutex_status == osOK) {
-				if (TS_State.touchX[0] > WW_BOX_X_START && TS_State.touchX[0] < WW_BOX_X_START + WW_CELLS_X_AXIS * WW_CELL_SIZE &&
-					TS_State.touchY[0] > WW_BOX_Y_START && TS_State.touchY[0] < WW_BOX_Y_START + WW_CELLS_Y_AXIS * WW_CELL_SIZE) {
-					uint16_t x = (TS_State.touchX[0] - WW_BOX_X_START) / WW_CELL_SIZE;
-					uint16_t y = (TS_State.touchY[0] - WW_BOX_Y_START) / WW_CELL_SIZE;
+			if (TS_State.touchX[0] > WW_BOX_X_START && TS_State.touchX[0] < WW_BOX_X_START + WW_CELLS_X_AXIS * WW_CELL_SIZE &&
+				TS_State.touchY[0] > WW_BOX_Y_START && TS_State.touchY[0] < WW_BOX_Y_START + WW_CELLS_Y_AXIS * WW_CELL_SIZE) {
+				uint16_t x = (TS_State.touchX[0] - WW_BOX_X_START) / WW_CELL_SIZE;
+				uint16_t y = (TS_State.touchY[0] - WW_BOX_Y_START) / WW_CELL_SIZE;
 
-					ww_map[y][x] = WW_YELLOW;
-				}
+				ww_map[y][x] = WW_YELLOW;
 			}
-			osMutexRelease(ww_mutex_id);
 
 			ww_info->stack_space = stack_space;
 			if(osMessageQueuePut(thread_manager_message, &ww_info, 0, osWaitForever) == osOK) {
