@@ -82,8 +82,8 @@ all: main-build
 main-build: EmbSys.elf secondary-outputs
 
 # Tool invocations
-EmbSys.elf EmbSys.map: $(OBJS) $(USER_OBJS) /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/STM32F769NIHX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "EmbSys.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/STM32F769NIHX_FLASH.ld" --specs=nosys.specs -Wl,-Map="EmbSys.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+EmbSys.elf EmbSys.map: $(OBJS) $(USER_OBJS) /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/STM32F769NIHX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "EmbSys.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/STM32F769NIHX_FLASH.ld" --specs=nosys.specs -Wl,-Map="EmbSys.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

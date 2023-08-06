@@ -66,16 +66,16 @@ Core/Src/stm32f7xx_it.o: ../Core/Src/stm32f7xx_it.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_ts.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_lcd.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/otm8009a/otm8009a.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/adv7533.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/../Common/audio.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_sdram.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../../../Utilities/Fonts/fonts.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/ft6x06.h \
- /home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/../Common/ts.h
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_ts.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_lcd.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/otm8009a/otm8009a.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/adv7533.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/../Common/audio.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_sdram.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../../../Utilities/Fonts/fonts.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/ft6x06.h \
+ /home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/../Common/ts.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal.h:
 ../Core/Inc/stm32f7xx_hal_conf.h:
@@ -144,13 +144,13 @@ Core/Src/stm32f7xx_it.o: ../Core/Src/stm32f7xx_it.c ../Core/Inc/main.h \
 ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_ts.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_lcd.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/otm8009a/otm8009a.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/adv7533.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/../Common/audio.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_sdram.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../../../Utilities/Fonts/fonts.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/ft6x06.h:
-/home/gabrijel/fri/2_year/1_semester/6_VGRS/project/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/../Common/ts.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_ts.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_lcd.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/otm8009a/otm8009a.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/adv7533.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/adv7533/../Common/audio.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/stm32f769i_discovery_sdram.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../../../Utilities/Fonts/fonts.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/ft6x06.h:
+/home/nejcokorn/Desktop/vgrajeni_sistemi/stm32f769DISCO/EmbSys/Drivers/BSP/STM32F769I-Discovery/../Components/ft6x06/../Common/ts.h:
