@@ -146,7 +146,21 @@ const osThreadAttr_t game_of_life_Task_attributes = {
 osThreadId_t wirewolrd_taskHandle;
 const osThreadAttr_t wirewolrd_Task_attributes = {
 		.name = "Ww",
-		.stack_size = FIBBIONACI_STACK_CAPACITY,
+		.stack_size = WW_STACK_CAPACITY,
+		.priority = (osPriority_t) osPriorityNormal,
+};
+
+osThreadId_t ww_RED_taskHandle;
+const osThreadAttr_t ww_red_Task_attributes = {
+		.name = "ww_red",
+		.stack_size = WW_STACK_CAPACITY,
+		.priority = (osPriority_t) osPriorityNormal,
+};
+
+osThreadId_t ww_BLUE_taskHandle;
+const osThreadAttr_t ww_blue_Task_attributes = {
+		.name = "ww_blue",
+		.stack_size = WW_STACK_CAPACITY,
 		.priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -327,12 +341,12 @@ void prepare_gol() {
 	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
 
 	// draw horizontal lines
-	for (int i = 0; i < GOL_CELLS; i++) {
+	for (int i = 0; i <= GOL_CELLS; i++) {
 		BSP_LCD_DrawHLine(GOL_STARTPOINT_X, GOL_STARTPOINT_Y + i * GOL_CELL_SIZE, GOL_BOX_SIZE);
 	}
 
 	// draw vertical lines
-	for (int i = 0; i < GOL_CELLS; i++) {
+	for (int i = 0; i <= GOL_CELLS; i++) {
 		BSP_LCD_DrawVLine(GOL_STARTPOINT_X + i * GOL_CELL_SIZE, GOL_STARTPOINT_Y, GOL_BOX_SIZE);
 	}
 }
@@ -486,6 +500,86 @@ void game_of_life_t (void* args) {
 	}
 }
 
+#define WW_BOX_X_START 	220
+#define WW_BOX_Y_START 	100
+#define WW_CELL_SIZE	40
+#define WW_CELLS_X_AXIS	14
+#define WW_CELLS_Y_AXIS	9
+
+#define WW_BLACK 0
+#define WW_YELLOW 1
+#define WW_RED 2
+#define WW_BLUE 3
+
+#define MEM_BLOCK_SIZE_MUTEX WW_CELLS_X_AXIS * WW_CELLS_Y_AXIS * 1
+uint8_t ww_map[WW_CELLS_Y_AXIS][WW_CELLS_X_AXIS];
+uint8_t ww_map_prev[WW_CELLS_Y_AXIS][WW_CELLS_X_AXIS];
+osTimerId_t timer_ww;
+bool ww_step = false;
+
+bool ww_red_finished = false;
+bool ww_blue_finished = false;
+
+osMutexId_t ww_mutex_id;
+osStatus mutex_status;
+const osMutexAttr_t ww_mutex = {
+		"ww_mutex",
+		osMutexRobust,
+		NULL,
+		0
+};
+
+void ww_timer_func () {
+	ww_step = true;
+}
+
+void ww_display_map() {
+
+		for (int i = 0; i < WW_CELLS_Y_AXIS; i++) {
+			for (int j = 0; j < WW_CELLS_X_AXIS; j++) {
+				if (ww_map[i][j] == WW_BLACK) {
+					BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+				} else if (ww_map[i][j] == WW_YELLOW) {
+					BSP_LCD_SetTextColor(LCD_COLOR_YELLOW);
+				} else if (ww_map[i][j] == WW_RED) {
+					BSP_LCD_SetTextColor(LCD_COLOR_RED);
+				} else {
+					BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
+				}
+				BSP_LCD_FillRect(WW_BOX_X_START + j * WW_CELL_SIZE + 1, WW_BOX_Y_START + i * WW_CELL_SIZE + 1, WW_CELL_SIZE - 1, WW_CELL_SIZE - 1);
+			}
+		}
+		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+
+		for (int i = 0; i < WW_CELLS_Y_AXIS; i++) {
+				for (int j = 0; j < WW_CELLS_X_AXIS; j++) {
+					// Only if all the processes were finished
+					if (ww_blue_finished && ww_red_finished) {
+						ww_map_prev[j][i] = ww_map[j][i];
+						ww_red_finished = false;
+						ww_blue_finished = false;
+					}
+				}
+		}
+}
+
+void prepare_ww () {
+	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+	BSP_LCD_FillRect(WW_BOX_X_START, WW_BOX_Y_START, WW_CELLS_X_AXIS * WW_CELL_SIZE, WW_CELLS_Y_AXIS * WW_CELL_SIZE);
+	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+
+	// draw horizontal lines
+	for (int i = 0; i <= WW_CELLS_Y_AXIS; i++) {
+		BSP_LCD_DrawHLine(WW_BOX_X_START, WW_BOX_Y_START + i * WW_CELL_SIZE, WW_CELLS_X_AXIS * WW_CELL_SIZE);
+	}
+
+	// draw vertical lines
+	for (int i = 0; i <= WW_CELLS_X_AXIS; i++) {
+		BSP_LCD_DrawVLine(WW_BOX_X_START + i * WW_CELL_SIZE, WW_BOX_Y_START, WW_CELLS_Y_AXIS * WW_CELL_SIZE);
+	}
+	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+}
+
 void wireworld_t (void* args) {
 
 	thread_info *ww_info = malloc(sizeof(thread_info));
@@ -494,10 +588,35 @@ void wireworld_t (void* args) {
 	ww_info->stack_size = WW_STACK_CAPACITY;
 	ww_info->time_running = 0;
 
+	// Starting pattern
+	ww_map[0][1] = WW_BLUE;
+	ww_map[0][2] = WW_YELLOW;
+	ww_map[1][0] = WW_RED;
+	ww_map[2][1] = WW_YELLOW;
+	ww_map[2][2] = WW_YELLOW;
+	ww_map[1][3] = WW_YELLOW;
+
 	while(1) {
 
 		if (APP_PAGE == WW) {
 			int stack_space = osThreadGetStackSpace(wirewolrd_taskHandle);
+
+			if (ww_step == true) {
+				ww_display_map(ww_map);
+				ww_step = false;
+			}
+
+			mutex_status = osMutexAcquire(ww_mutex_id, osWaitForever);
+			if (mutex_status == osOK) {
+				if (TS_State.touchX[0] > WW_BOX_X_START && TS_State.touchX[0] < WW_BOX_X_START + WW_CELLS_X_AXIS * WW_CELL_SIZE &&
+					TS_State.touchY[0] > WW_BOX_Y_START && TS_State.touchY[0] < WW_BOX_Y_START + WW_CELLS_Y_AXIS * WW_CELL_SIZE) {
+					uint16_t x = (TS_State.touchX[0] - WW_BOX_X_START) / WW_CELL_SIZE;
+					uint16_t y = (TS_State.touchY[0] - WW_BOX_Y_START) / WW_CELL_SIZE;
+
+					ww_map[y][x] = WW_YELLOW;
+				}
+			}
+			osMutexRelease(ww_mutex_id);
 
 			ww_info->stack_space = stack_space;
 			if(osMessageQueuePut(thread_manager_message, &ww_info, 0, osWaitForever) == osOK) {
@@ -509,17 +628,92 @@ void wireworld_t (void* args) {
 	}
 }
 
+void ww_red_t () {
+	while (1) {
+		mutex_status = osMutexAcquire(ww_mutex_id, osWaitForever);
+		if (mutex_status == osOK) {
+			for (int i = 0; i < WW_CELLS_Y_AXIS; i++) {
+				for (int j = 0; j < WW_CELLS_X_AXIS; j++) {
+
+					if (ww_map_prev[j][i] == WW_BLUE) {
+						ww_map[j][i] = WW_RED;
+					}
+
+				}
+			}
+		}
+		ww_red_finished = true;
+		osMutexRelease(ww_mutex_id);
+		osDelay(20);
+	}
+}
+
+void ww_blue_t () {
+	while(1) {
+		mutex_status = osMutexAcquire(ww_mutex_id, osWaitForever);
+		if (mutex_status == osOK) {
+
+			for (int i = 0; i < WW_CELLS_Y_AXIS; i++) {
+				for (int j = 0; j < WW_CELLS_X_AXIS; j++) {
+
+					uint8_t neigh = 0;
+					// count neigbours
+					if (ww_map_prev[i][j] == WW_YELLOW) {
+						if (i > 0) {
+							if (j > 0) {
+								if (ww_map_prev[i - 1][j - 1] == WW_BLUE) neigh++; // 1 - levo gor
+							}
+							if (ww_map_prev[i - 1][j] == WW_BLUE) neigh++; // 2 - gor
+							if (j < WW_CELLS_X_AXIS - 1) {
+								if (ww_map_prev[i - 1][j + 1] == WW_BLUE) neigh++; // 3 - desno gor
+							}
+						}
+						if (i < WW_CELLS_Y_AXIS - 1) {
+							if (j > 0) {
+								if (ww_map_prev[i + 1][j - 1] == WW_BLUE) neigh++; // 4 - levo dol
+							}
+							if (ww_map_prev[i + 1][j] == WW_BLUE) neigh++; // 5 - dol
+							if (j < WW_CELLS_X_AXIS - 1) {
+								if (ww_map_prev[i + 1][j + 1] == WW_BLUE) neigh++; // 6 - desno dol
+							}
+						}
+						if (j > 0) {
+								if (ww_map_prev[i][j - 1] == WW_BLUE) neigh++; // 7 - levo
+						}
+						if (j < WW_CELLS_X_AXIS - 1) {
+								if (ww_map_prev[i][j + 1] == WW_BLUE) neigh++; // 8 - desno
+						}
+
+						if (!(neigh == 1 || neigh == 2)) {
+							ww_map[i][j] = WW_BLUE;
+						}
+					}
+				}
+			}
+			ww_blue_finished = true;
+		}
+		osMutexRelease(ww_mutex_id);
+		osDelay(20);
+	}
+}
+
 void prepare_pages() {
+	if (APP_PAGE == FIB) {
+		BSP_LCD_SetTextColor(LCD_COLOR_DARKYELLOW);
+		BSP_LCD_FillRect(STACK_VIEW_WIDTH, MENU_HEIGHT, BSP_LCD_GetXSize() - STACK_VIEW_WIDTH, BSP_LCD_GetYSize() - MENU_HEIGHT);
+		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+		fibonacci_prepare();
+	} else if (APP_PAGE == GOL) {
 		BSP_LCD_SetTextColor(LCD_COLOR_DARKGRAY);
 		BSP_LCD_FillRect(STACK_VIEW_WIDTH, MENU_HEIGHT, BSP_LCD_GetXSize() - STACK_VIEW_WIDTH, BSP_LCD_GetYSize() - MENU_HEIGHT);
 		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
-		if (APP_PAGE == FIB) {
-			fibonacci_prepare();
-		} else if (APP_PAGE == GOL) {
-			prepare_gol();
-		} else {
-
-		}
+		prepare_gol();
+	} else {
+		BSP_LCD_SetTextColor(LCD_COLOR_DARKMAGENTA);
+		BSP_LCD_FillRect(STACK_VIEW_WIDTH, MENU_HEIGHT, BSP_LCD_GetXSize() - STACK_VIEW_WIDTH, BSP_LCD_GetYSize() - MENU_HEIGHT);
+		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+		prepare_ww();
+	}
 }
 
 void refresh_navigation() {
@@ -716,6 +910,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+  ww_mutex_id = osMutexNew(&ww_mutex);
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -727,6 +922,10 @@ int main(void)
   timer_gol = osTimerNew(gol_timer_func, osTimerPeriodic, NULL, NULL);
   if (timer_gol != NULL) {
 	  osTimerStart(timer_gol, 500);
+  }
+  timer_ww = osTimerNew(ww_timer_func, osTimerPeriodic, NULL, NULL);
+  if (timer_ww != NULL) {
+	  osTimerStart(timer_ww, 1000);
   }
   /* USER CODE END RTOS_TIMERS */
 
@@ -744,6 +943,8 @@ int main(void)
 	fibonacci_taskHandle = osThreadNew(fibonacci_t, NULL, &fibonacci_Task_attributes);
 	game_of_life_taskHandle = osThreadNew(game_of_life_t, NULL, &game_of_life_Task_attributes);
 	wirewolrd_taskHandle = osThreadNew(wireworld_t, NULL, &wirewolrd_Task_attributes);
+	ww_RED_taskHandle = osThreadNew(ww_red_t, NULL, &ww_red_Task_attributes);
+//	ww_BLUE_taskHandle = osThreadNew(ww_blue_t, NULL, &ww_blue_Task_attributes);
 	LCD_manager_taskHandle = osThreadNew(LCD_manager_t, NULL, &LCD_manager_Task_attributes);
   /* USER CODE END RTOS_THREADS */
 
