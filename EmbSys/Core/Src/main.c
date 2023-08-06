@@ -303,6 +303,7 @@ void fibonacci_t (void* args) {
 			if (TS_State.touchDetected > 0) {
 				if (TS_State.touchY[0] > 300 && TS_State.touchX[0] < STACK_VIEW_WIDTH) {
 					osThreadTerminate(fibonacci_taskHandle);
+//					osThreadYield();
 				} else if (TS_State.touchX[0] > 300 && TS_State.touchX[0] < 450 && TS_State.touchY[0] > 150 && TS_State.touchY[0] < 350) {
 					calculating = fibonacci_dec(calculating);
 				} else if (TS_State.touchX[0] > 500 && TS_State.touchX[0] < 650 && TS_State.touchY[0] > 150 && TS_State.touchY[0] < 350) {
@@ -447,6 +448,7 @@ void game_of_life_t (void* args) {
 		}
 	}
 
+	// Never ending pattern
 	grid[3][4] = true;
 	grid[4][3] = true;
 	grid[4][4] = true;
@@ -464,10 +466,13 @@ void game_of_life_t (void* args) {
 			BSP_TS_GetState(&TS_State);
 			if (TS_State.touchDetected > 0) {
 
-				uint16_t x = (TS_State.touchX[0] - GOL_STARTPOINT_X) / GOL_CELL_SIZE;
-				uint16_t y = (TS_State.touchY[0] - GOL_STARTPOINT_Y) / GOL_CELL_SIZE;
+				if (TS_State.touchX[0] > GOL_STARTPOINT_X && TS_State.touchX[0] < GOL_STARTPOINT_X + GOL_BOX_SIZE &&
+						TS_State.touchY[0] > GOL_STARTPOINT_Y && TS_State.touchY[0] < GOL_STARTPOINT_Y + GOL_BOX_SIZE) {
+						uint16_t x = (TS_State.touchX[0] - GOL_STARTPOINT_X) / GOL_CELL_SIZE;
+						uint16_t y = (TS_State.touchY[0] - GOL_STARTPOINT_Y) / GOL_CELL_SIZE;
 
-				grid[y][x] = true;
+						grid[y][x] = true;
+				}
 
 				if (TS_State.touchY[0] > 300 && TS_State.touchX[0] < STACK_VIEW_WIDTH) {
 					GOL_running = false;
@@ -477,7 +482,7 @@ void game_of_life_t (void* args) {
 		}
 
 
-		osDelay(20);
+		osDelay(50);
 	}
 }
 
@@ -543,6 +548,7 @@ void refresh_navigation() {
 		prepare_pages();
 		prev_page = APP_PAGE;
 	}
+	osDelay(20);
 
 }
 
@@ -629,11 +635,6 @@ void LCD_manager_t (void* args) {
 		char sent_messages_str[strlen(MSG) + sent_messages_strlen];
 		sprintf(sent_messages_str, "%s:%04d", MSG, sent_messages);
 		BSP_LCD_DisplayStringAt(10, 190, (uint8_t*) sent_messages_str, LEFT_MODE);
-
-
-
-//		uint8_t* mask = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-
 
 		osDelay(50);
 	}
